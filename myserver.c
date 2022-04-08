@@ -70,6 +70,10 @@ int main()
     if (client_sd < 0)
         perror("accept");
     
+    // Request logging
+    printf("Request from %s:%d\n", inet_ntoa(client_addr.sin_addr), client_addr.sin_port);
+    
+
     char msg[] = "Hello client !\n";
     write(client_sd, msg, sizeof(msg));
 
