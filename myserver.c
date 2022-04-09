@@ -130,8 +130,8 @@ void handle_request(int client_sd)
     printf("------------\n");
 
     /* < -- parsing request line into method, filename, content-type -- > */
-    // client_read = fdopen(client_sd, "r");
-    // client_write = fdopen(dup(client_sd), "w");
+    client_read = fdopen(client_sd, "r");
+    client_write = fdopen(dup(client_sd), "w");
 
     fgets(line, REQ_LINE, client_read);
     // looking for substring "HTTP/" -> checking the file type is http
