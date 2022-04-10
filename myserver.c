@@ -9,13 +9,14 @@
 
 #define MAX_LINE 20
 #define REQ_LINE 200
+#define BUF_SIZE 65536
 
 // funtion prototype
 int take_input();
 void handle_request(int client_sd);
 char *get_content_type(char *filename);
-void send_data(FILE *client_w, char *ct, char *file_name);
-void send_error(FILE *client_w);
+void send_data(int client_sd, char *ct, char *file_name);
+void send_error(int client_sd);
 
 int main()
 {
@@ -113,9 +114,7 @@ int take_input(char **args)
 
 void handle_request(int client_sd)
 {
-    FILE *client_read;
-    FILE *client_write;
-    char line[REQ_LINE];
+    char *parsed = NULL;
 
     char method[10];
     char file_name[30];
@@ -129,34 +128,30 @@ void handle_request(int client_sd)
     printf("%s", msg);
     printf("------------\n");
 
-    /* < -- parsing request line into method, filename, content-type -- > */
-    client_read = fdopen(client_sd, "r");
-    client_write = fdopen(dup(client_sd), "w");
+    /* < -- parsing request line into method, file name, content-type -- > */
 
-    fgets(line, REQ_LINE, client_read);
+    parsed = strtok(msg, "\n");
+
     // looking for substring "HTTP/" -> checking the file type is http
-    if (strstr(line, "HTTP/") == NULL) {
-        send_error(client_write);
-        fclose(client_read);
-        fclose(client_write);
+    if (strstr(parsed, "HTTP/") == NULL) {
+        send_error(client_sd);
         return;
     }
 
-    // check requested method is GET
-    strcpy(method, strtok(line, " /"));
+    // check requested method is GET -> we're just accepting only GET
+    strcpy(method, strtok(parsed, " /"));
     if (strcmp(method, "GET") != 0) {
-        send_error(client_write);
-        fclose(client_read);
-        fclose(client_write);
+        send_error(client_sd);
         return;
     }
 
     strcpy(file_name, strtok(NULL, " /"));
     strcpy(content_type, get_content_type(file_name));
-    fclose(client_read); // read done
 
+    send_data(client_sd, content_type, file_name);
 
-    send_data(client_write, content_type, file_name);
+    shutdown(client_sd, SHUT_RDWR);
+    close(client_sd);
 
 }
 
@@ -177,43 +172,37 @@ char *get_content_type(char *filename)
 }
 
 // write data message on client
-void send_data(FILE *client_w, char *ct, char *file_name)
+void send_data(int client_sd, char *ct, char *file_name)
 {
-    char protocol[] = "HTTP/1.0 200 OK\r\n";
+    char protocol[] = "HTTP/1.1 200 OK\n\n";
     char server[] = "Server:My Own Server!\r\n";
     char *content_type;
-    char buf[2048];
+    char buf[1024];
+
+    int fd, len;
+
+    char final_path[BUF_SIZE];
 
     content_type = ct;
     printf("content-type : %s\n", content_type);
 
     // file to send
-    FILE *obj = fopen(file_name, "r");
-    int fd = fileno(client_w);
-    if (obj == NULL) {
-        printf("file not found\n");
-        send_error(client_w);
-        fclose(client_w);
+    if ((fd = open(file_name, O_RDONLY)) == -1) {
+        write(client_sd, "HTTP/1.1 404 Not Found\n", 23);
         return;
     }
 
     // send header to packet
-    send(fd, "HTTP/1.0 200 OK\r\n", 17, 0);
-    // fputs(protocol, client_w);
-    fputs(server, client_w);
-    fputs(content_type, client_w);
-
-    while (fgets(buf, 2048, obj) != NULL) {
-        write(fd, buf, 2048);
-        fflush(client_w);
+    send(client_sd, protocol, 17, 0);
+    while(1) {
+        len = read(fd, buf, 1024);
+        if (len < 0) break;
+        write(client_sd, buf, len);
     }
-
-    fflush(client_w);
-    fclose(client_w);
 }
 
 // write error message on client
-void send_error(FILE *client_w)
+void send_error(int client_sd)
 {
     char protocol[] = "HTTP/1.0 400 Bad Request\r\n";
     char server[] = "Server:My Own Server!\r\n";
@@ -221,8 +210,8 @@ void send_error(FILE *client_w)
     char content[] = "<html><head><title>오류가 발생했습니다. 파일명을 확인해주세요.</title></head></html>";
 
     // write header
-    fputs(protocol, client_w);
-    fputs(server, client_w);
-    fputs(content_type, client_w);
-    fflush(client_w);
+    write(client_sd, protocol, sizeof(protocol));
+    write(client_sd, server, sizeof(server));
+    write(client_sd, content_type, sizeof(content_type));
+    write(client_sd, content, sizeof(content));
 }
