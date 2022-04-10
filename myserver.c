@@ -9,14 +9,12 @@
 
 #define MAX_LINE 20
 #define REQ_LINE 200
-#define BUF_SIZE 65536
 
 // funtion prototype
 int take_input();
 void handle_request(int client_sd);
 char *get_content_type(char *filename);
 void send_data(int client_sd, char *ct, char *file_name);
-void send_error(int client_sd);
 
 int main()
 {
@@ -83,8 +81,6 @@ int main()
 
         handle_request(client_sd);
     }
-
-    close(server_sd);
     
     return 0;
 }
@@ -134,14 +130,12 @@ void handle_request(int client_sd)
 
     // looking for substring "HTTP/" -> checking the file type is http
     if (strstr(parsed, "HTTP/") == NULL) {
-        send_error(client_sd);
         return;
     }
 
     // check requested method is GET -> we're just accepting only GET
     strcpy(method, strtok(parsed, " /"));
     if (strcmp(method, "GET") != 0) {
-        send_error(client_sd);
         return;
     }
 
@@ -181,10 +175,7 @@ void send_data(int client_sd, char *ct, char *file_name)
 
     int fd, len;
 
-    char final_path[BUF_SIZE];
-
     content_type = ct;
-    printf("content-type : %s\n", content_type);
 
     // file to send
     if ((fd = open(file_name, O_RDONLY)) == -1) {
@@ -199,19 +190,4 @@ void send_data(int client_sd, char *ct, char *file_name)
         if (len < 0) break;
         write(client_sd, buf, len);
     }
-}
-
-// write error message on client
-void send_error(int client_sd)
-{
-    char protocol[] = "HTTP/1.0 400 Bad Request\r\n";
-    char server[] = "Server:My Own Server!\r\n";
-    char content_type[] = "Content-type:text/html\r\n\r\n";
-    char content[] = "<html><head><title>오류가 발생했습니다. 파일명을 확인해주세요.</title></head></html>";
-
-    // write header
-    write(client_sd, protocol, sizeof(protocol));
-    write(client_sd, server, sizeof(server));
-    write(client_sd, content_type, sizeof(content_type));
-    write(client_sd, content, sizeof(content));
 }
