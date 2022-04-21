@@ -87,6 +87,12 @@ int main()
     return 0;
 }
 
+/**
+ * @brief take input from user with command '%myserver [port]'
+ * 
+ * @param args placeholder for command line
+ * @return int 
+ */
 int take_input(char **args)
 {
     int port = -1;
@@ -110,6 +116,11 @@ int take_input(char **args)
     return port;
 }
 
+/**
+ * @brief function handles request in server. Also prints request message from client
+ * 
+ * @param client_sd client socket descriptor
+ */
 void handle_request(int client_sd)
 {
     char *parsed = NULL;
@@ -148,6 +159,12 @@ void handle_request(int client_sd)
 
 }
 
+/**
+ * @brief Get the content type object of html
+ * 
+ * @param filename requested by client
+ * @return MIME Type
+ */
 char *get_content_type(char *filename)
 {
     char extension[100];
@@ -176,7 +193,13 @@ char *get_content_type(char *filename)
     }
 }
 
-// write data message on client
+/**
+ * @brief write data message on client
+ * 
+ * @param client_sd 
+ * @param ct content-type
+ * @param file_name requested by client
+ */
 void send_data(int client_sd, char *ct, char *file_name)
 {
     char protocol[] = "HTTP/1.1 200 OK\n\n";
