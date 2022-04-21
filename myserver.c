@@ -24,7 +24,6 @@ int main()
     struct sockaddr_in client_addr; // socket address structure (client)
     socklen_t client_size;
     char args[2][12]; // placeholder for command line
-    pthread_t tid;
 
     port = take_input(args);
     printf("set port : %d\n", port);
@@ -80,7 +79,10 @@ int main()
         printf("Request from %s:%d\n", inet_ntoa(client_addr.sin_addr), client_addr.sin_port);
 
         handle_request(client_sd);
+        close(client_sd);
     }
+
+    shutdown(client_sd, SHUT_RDWR);
     
     return 0;
 }
@@ -144,9 +146,6 @@ void handle_request(int client_sd)
 
     send_data(client_sd, content_type, file_name);
 
-    shutdown(client_sd, SHUT_RDWR);
-    close(client_sd);
-
 }
 
 char *get_content_type(char *filename)
@@ -160,6 +159,18 @@ char *get_content_type(char *filename)
 
     if (strcmp(extension, "html") == 0 || strcmp(extension, "htm"))
         return "text/html";
+    else if (strcmp(extension, "gif") == 0) {
+        return "image/gif";
+    }
+    else if (strcmp(extension, "jpeg") == 0) {
+        return "image/jpeg";
+    }
+    else if (strcmp(extension, "mp3") == 0) {
+        return "audio/mpeg";
+    }
+    else if (strcmp(extension, "pdf") == 0) {
+        return "application/pdf";
+    }
     else {
         return "text/plain";
     }
@@ -173,6 +184,8 @@ void send_data(int client_sd, char *ct, char *file_name)
     char *content_type;
     char buf[1024];
 
+    FILE *cfd;
+
     int fd, len;
 
     content_type = ct;
@@ -185,9 +198,10 @@ void send_data(int client_sd, char *ct, char *file_name)
 
     // send header to packet
     send(client_sd, protocol, 17, 0);
+
     while(1) {
         len = read(fd, buf, 1024);
-        if (len < 0) break;
+        if (len == 0) break;
         write(client_sd, buf, len);
     }
 }
